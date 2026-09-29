@@ -1,0 +1,21 @@
+{
+  "flight": {
+    "max_altitude": 50,
+    "max_speed": 10,
+    "default_altitude": 20,
+    "default_speed": 5,
+    "rtl_altitude": 15
+  },
+  "battery": {
+    "low_battery_warning": 30,
+    "critical_battery": 15
+  },
+  "gps": {
+    "minimum_satellites": 8
+  },
+  "geofence": {
+    "enabled": true,
+    "radius": 1000,
+    "max_altitude": 50
+  }
+}

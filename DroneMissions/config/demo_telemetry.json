@@ -1,0 +1,18 @@
+{
+  "source": "simulation",
+  "timestamp": "2026-09-30T02:10:00+05:30",
+  "latitude": 13.0827,
+  "longitude": 80.2707,
+  "altitude": 120.5,
+  "ground_speed": 8.4,
+  "heading": 90.0,
+  "battery": {
+    "percentage": 82,
+    "voltage": 15.9,
+    "current": 4.2
+  },
+  "flight_mode": "LOITER",
+  "armed": true,
+  "gps_satellites": 14,
+  "gps_accuracy": 2.5
+}

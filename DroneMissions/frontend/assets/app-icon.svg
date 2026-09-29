@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Drone Missions UAV telemetry mark">
+<defs><radialGradient id="bg" cx="35%" cy="28%" r="78%"><stop stop-color="#1d4663"/><stop offset=".54" stop-color="#102b45"/><stop offset="1" stop-color="#091827"/></radialGradient><linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#64dcff" stop-opacity=".9"/><stop offset=".5" stop-color="#408cff" stop-opacity=".5"/><stop offset="1" stop-color="#1a456c" stop-opacity=".8"/></linearGradient><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<circle cx="128" cy="128" r="122" fill="#050c14"/><circle cx="128" cy="128" r="119" fill="url(#bg)" stroke="url(#rim)" stroke-width="3"/>
+<circle cx="128" cy="128" r="91" fill="none" stroke="#6bbcff" stroke-opacity=".16" stroke-width="1.5"/>
+<!-- open telemetry/control ring with a deliberate signal tail -->
+<path d="M70 76a79 79 0 0 1 126 16M204 113a79 79 0 0 1-9 51l12 22-28-8M61 166a79 79 0 0 1-7-48" fill="none" stroke="#56baff" stroke-width="7" stroke-linecap="round" opacity=".82"/>
+<path d="M78 62a95 95 0 0 1 106-7" fill="none" stroke="#41d7e8" stroke-width="2" stroke-linecap="round" opacity=".4"/>
+<!-- four-arm UAV silhouette -->
+<g fill="none" stroke="#f4f8fc" stroke-linecap="round" stroke-linejoin="round">
+<path d="M104 111 76 83M152 111l28-28M104 145l-28 28M152 145l28 28" stroke-width="10"/>
+<path d="M66 83h20M170 83h20M66 173h20M170 173h20" stroke-width="5"/>
+<circle cx="76" cy="83" r="11" fill="#dce8f1" stroke="#f8fbff" stroke-width="3"/><circle cx="180" cy="83" r="11" fill="#dce8f1" stroke="#f8fbff" stroke-width="3"/><circle cx="76" cy="173" r="11" fill="#dce8f1" stroke="#f8fbff" stroke-width="3"/><circle cx="180" cy="173" r="11" fill="#dce8f1" stroke="#f8fbff" stroke-width="3"/>
+<path d="M102 110q26-18 52 0v38q-26 18-52 0z" fill="#f4f8fc" stroke="#f4f8fc" stroke-width="2"/><path d="M115 117h26v24h-26z" fill="#183851" stroke="none"/>
+</g>
+<!-- live telemetry indicator -->
+<circle cx="194" cy="62" r="14" fill="#0a1a27" stroke="#86f4ea" stroke-width="2"/><circle cx="194" cy="62" r="6" fill="#5af2d7" filter="url(#glow)"/>
+<path d="M117 129h22M128 118v22" stroke="#71eadb" stroke-width="3" stroke-linecap="round"/>
+</svg>
