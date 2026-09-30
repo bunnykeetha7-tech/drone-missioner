@@ -5,6 +5,8 @@ A local-first GCS with an explicit JSON-powered simulation mode. Dashboard telem
 ## Features
 
 - FastAPI backend, responsive dashboard, JWT authentication and SQLite persistence
+- API-backed operator registration with full name/email, username or email sign-in, password confirmation, and browser remember-session behavior; existing username/password registrations and accounts remain compatible
+- Operator-focused three-column flight instruments, large Leaflet map, dynamic roll/pitch horizon, live status panel, telemetry and mission controls
 - Simulation mission editor, validation, upload, controls, live WebSocket telemetry, maps, charts and generated flight logs
 - Dashboard Drone Connection panel with Auto Connect, explicit connection states, link/telemetry health, heartbeat, protocol and connection method
 - Dashboard simulated gimbal/camera preview with configurable normalized pitch mapping and adjustable preview shake; it is not a live video feed
@@ -12,6 +14,8 @@ A local-first GCS with an explicit JSON-powered simulation mode. Dashboard telem
 - Independent map-click terrain elevation lookup and browser Current Location; map coordinates, device GPS, and drone telemetry use separate markers and state
 - Simulation parameter management in `config/parameters.json`
 - A fail-closed real-drone adapter placeholder; no vendor or protocol is assumed
+
+The Settings page keeps Real Drone unavailable until the company aircraft protocol and a validated adapter are provided. The Emergency Stop control confirms a simulated emergency landing through the simulator's existing LAND action; it does not implement a physical motor stop.
 
 ## Architecture
 
@@ -29,6 +33,8 @@ Connection telemetry health is based on backend telemetry reception, not the Con
 2. Double-click `start.bat` from the extracted project folder. It creates `.venv`, installs requirements, and runs Uvicorn on `0.0.0.0:8000`.
 3. Open `http://127.0.0.1:8000`; Swagger is at `http://127.0.0.1:8000/docs`. Other devices on the LAN can use the host PC's LAN address on port 8000. Only use trusted networks.
 4. Demo login: **admin / admin123**.
+
+Use **CREATE ACCOUNT** on the login screen to register. Full name and email are stored by the existing SQLite-backed authentication API. Existing user rows are retained by an automatic additive schema migration. Sign-in accepts either username or email.
 
 Manual run from the project root: `python -m venv .venv`, `.venv\Scripts\activate`, `pip install -r backend\requirements.txt`, then `uvicorn backend.main:app --host 0.0.0.0 --port 8000`. SQLite creates `backend/database` automatically at startup.
 

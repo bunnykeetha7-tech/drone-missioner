@@ -29,7 +29,7 @@
   }
 
   async function refresh() {
-    if (!localStorage.getItem('dm_token') || !window.DMApi) return;
+    if (!(localStorage.getItem('dm_token') || sessionStorage.getItem('dm_token')) || !window.DMApi) return;
     try { render(await window.DMApi('/api/gimbal/status')); }
     catch (_) { /* The main app owns auth and API error messaging. */ }
   }
@@ -80,5 +80,5 @@
   }
 
   window.DroneGimbal = { init, refresh, render };
-  if (localStorage.getItem('dm_token')) init();
+  if (localStorage.getItem('dm_token') || sessionStorage.getItem('dm_token')) init();
 })();

@@ -10,7 +10,7 @@ def build_telemetry_router(simulator, source_getter, auth_dependency, gimbal=Non
     async def import_telemetry(payload: dict = Body(...), user=Depends(auth_dependency)):
         if source_getter() is not simulator:
             raise HTTPException(409, 'Telemetry JSON import is available only in Simulation mode.')
-        numeric_fields = ('latitude', 'longitude', 'altitude', 'ground_speed', 'heading', 'gps_satellites', 'gps_accuracy')
+        numeric_fields = ('latitude', 'longitude', 'altitude', 'ground_speed', 'heading', 'gps_satellites', 'gps_accuracy', 'roll', 'pitch', 'yaw')
         for field in numeric_fields:
             value = payload.get(field)
             if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))):

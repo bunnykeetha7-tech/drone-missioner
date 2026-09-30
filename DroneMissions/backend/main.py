@@ -1,4 +1,5 @@
 import asyncio, json, math, os, sqlite3, time, uuid, hmac, hashlib, base64
+import re
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
@@ -35,6 +36,10 @@ def db():
 def init_db():
  with db() as c:
   c.executescript('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, role TEXT DEFAULT 'operator'); CREATE TABLE IF NOT EXISTS missions(id TEXT PRIMARY KEY,name TEXT,items TEXT,created_at TEXT,updated_at TEXT); CREATE TABLE IF NOT EXISTS flights(id TEXT PRIMARY KEY,drone TEXT,started TEXT,ended TEXT,duration REAL,distance REAL,max_altitude REAL,max_speed REAL,battery_used REAL,status TEXT); CREATE TABLE IF NOT EXISTS telemetry(id INTEGER PRIMARY KEY,ts TEXT,payload TEXT); CREATE TABLE IF NOT EXISTS alerts(id INTEGER PRIMARY KEY,ts TEXT,severity TEXT,message TEXT,acknowledged INTEGER DEFAULT 0); CREATE TABLE IF NOT EXISTS parameters(name TEXT PRIMARY KEY,value TEXT,source TEXT); CREATE TABLE IF NOT EXISTS drones(id TEXT PRIMARY KEY,name TEXT,mode TEXT);''')
+  user_columns={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
+  if 'full_name' not in user_columns: c.execute('ALTER TABLE users ADD COLUMN full_name TEXT')
+  if 'email' not in user_columns: c.execute('ALTER TABLE users ADD COLUMN email TEXT')
+  c.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(email) WHERE email IS NOT NULL AND email != ''")
   if not c.execute('select 1 from users where username=?',('admin',)).fetchone(): c.execute('insert into users(username,password_hash) values(?,?)',('admin',pw_hash('admin123')))
   d=loadj('drone.json'); c.execute('insert or ignore into drones values(?,?,?)',(d['drone_id'],d['drone_name'],d['mode']))
 def fetchall(sql,args=()):
@@ -89,7 +94,7 @@ def source():
  mode=os.getenv('DATA_SOURCE',loadj('drone.json').get('mode','SIMULATION')).lower()
  return {'simulation':simulator,'mavlink':MAVLinkDrone()}.get(mode,simulator)
 class Login(BaseModel): username:str; password:str
-class Register(BaseModel): username:str; password:str
+class Register(BaseModel): username:str; password:str; full_name:str|None=None; email:str|None=None
 class MissionIn(BaseModel): name:str='New Mission'; items:list[dict[str,Any]]=[]
 class PhoneIn(BaseModel): data:dict[str,Any]
 def authdep(authorization:str|None=Header(default=None)): return current_user(authorization)
@@ -102,16 +107,20 @@ app.include_router(build_parameters_router(ROOT,loadj,savej,source,simulator,aut
 async def health(): return {'ok':True,'app':'Drone Missions','time':datetime.now(timezone.utc).isoformat()}
 @app.post('/api/auth/login')
 async def login(body:Login):
- with db() as c: row=c.execute('select * from users where username=?',(body.username,)).fetchone()
+ with db() as c: row=c.execute('select * from users where username=? or lower(email)=lower(?)',(body.username,body.username)).fetchone()
  if not row or not hmac.compare_digest(row['password_hash'],pw_hash(body.password)): raise HTTPException(401,'Incorrect username or password')
- return {'access_token':token(body.username),'token_type':'bearer','user':{'username':body.username,'role':row['role']}}
+ return {'access_token':token(row['username']),'token_type':'bearer','user':{'username':row['username'],'full_name':row['full_name'],'email':row['email'],'role':row['role']}}
 @app.post('/api/auth/register')
 async def register(body:Register):
+ username=body.username.strip(); full_name=(body.full_name or '').strip(); email=(body.email or '').strip().lower()
+ if not username or len(username)>80: raise HTTPException(400,'Username must contain 1 to 80 characters')
  if len(body.password)<8: raise HTTPException(400,'Password must contain at least 8 characters')
+ if bool(full_name)!=bool(email): raise HTTPException(400,'Full name and email must be provided together')
+ if full_name and (len(full_name)>120 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+",email)): raise HTTPException(400,'Enter a valid full name and email address')
  try:
-  with db() as c:c.execute('insert into users(username,password_hash) values(?,?)',(body.username,pw_hash(body.password)))
- except sqlite3.IntegrityError: raise HTTPException(409,'Username is already registered')
- return {'access_token':token(body.username),'token_type':'bearer','user':{'username':body.username}}
+  with db() as c:c.execute('insert into users(username,password_hash,full_name,email) values(?,?,?,?)',(username,pw_hash(body.password),full_name or None,email or None))
+ except sqlite3.IntegrityError as exc: raise HTTPException(409,'Email is already registered' if 'email' in str(exc).lower() else 'Username is already registered')
+ return {'access_token':token(username),'token_type':'bearer','user':{'username':username,'full_name':full_name or None,'email':email or None}}
 @app.get('/api/auth/me')
 async def me(user=__import__('fastapi').Depends(authdep)): return {'username':user}
 @app.get('/api/drones')
@@ -135,7 +144,8 @@ async def auto_connect(user=__import__('fastapi').Depends(authdep)):
  return {'connected':True,'attempted':['SIMULATION'],'status':state,'telemetry':telemetry,'message':'Connected to JSON simulation; telemetry and simulated heartbeat verified.'}
 @app.post('/api/drone/{action}')
 async def control(action:str,body:dict|None=None,user=__import__('fastapi').Depends(authdep)):
- if action not in {'connect','disconnect','arm','disarm','takeoff','land','rtl','pause','resume','start_mission'}: raise HTTPException(404,'Unknown control')
+ if action not in {'connect','disconnect','arm','disarm','takeoff','land','rtl','pause','resume','start_mission','emergency_stop'}: raise HTTPException(404,'Unknown control')
+ if action=='emergency_stop': action='land'
  return await source().command(action,body)
 @app.get('/api/drone/telemetry')
 async def telemetry(user=__import__('fastapi').Depends(authdep)):
