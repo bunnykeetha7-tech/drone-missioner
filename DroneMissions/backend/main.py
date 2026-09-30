@@ -69,7 +69,8 @@ class PhoneTelemetry(DroneInterface):
  async def connect(self): self.connected=True; return await self.get_status()
  async def disconnect(self): self.connected=False; return await self.get_status()
  async def get_status(self): return {'connected':self.connected,'mode':'PHONE','connection_type':'PHONE','drone':'Phone sensor demonstration','armed':False,'flight_mode':'PHONE TELEMETRY','adapter_ready':True,'message':'Phone browser sensor demo; not a flight controller.'}
- async def get_telemetry(self): return {**self.data,'source':'PHONE','timestamp':datetime.now(timezone.utc).isoformat()}
+ async def get_telemetry(self):
+  d=self.data; return {'source':'phone','timestamp':datetime.now(timezone.utc).isoformat(),'latitude':d.get('latitude'),'longitude':d.get('longitude'),'altitude':d.get('altitude'),'ground_speed':d.get('ground_speed'),'air_speed':d.get('air_speed',d.get('ground_speed')),'heading':d.get('heading'),'battery':{'percentage':d.get('battery'),'voltage':d.get('voltage'),'current':d.get('current')},'flight_mode':'PHONE TELEMETRY','armed':False,'gps_satellites':d.get('gps_satellites'),'gps_accuracy':None,'roll':d.get('roll'),'pitch':d.get('pitch'),'yaw':d.get('yaw',d.get('heading'))}
  async def command(self,name,payload=None): raise HTTPException(409,'Flight commands are disabled in Phone Telemetry mode')
  async def upload_mission(self,items): raise HTTPException(409,'Mission upload is unavailable in Phone Telemetry mode')
  async def download_mission(self): return []
@@ -82,7 +83,7 @@ class MAVLinkDrone(DroneInterface):
  async def connect(self): raise HTTPException(501,'Real drone connection is not configured.')
  async def disconnect(self): return {'connected':False}
  async def get_status(self): return {'connected':False,'state':'DISCONNECTED','mode':'REAL DRONE','source':'real_drone','connection_type':'OTHER','connection_state':'DISCONNECTED','connection_method':'NOT CONFIGURED','link_status':'OFFLINE','link_quality':'OFFLINE','link_quality_percent':None,'telemetry_status':'NOT RECEIVING','heartbeat':'--','heartbeat_at':None,'heartbeat_source':None,'protocol':'NOT CONFIGURED','simulated':False,'adapter_ready':False,'message':'REAL DRONE · NOT CONFIGURED. Confirm company hardware details and validate an adapter before connecting.'}
- async def get_telemetry(self): return {'source':'mavlink','timestamp':None,'latitude':None,'longitude':None,'altitude':None,'ground_speed':None,'heading':None,'battery':{'percentage':None,'voltage':None,'current':None},'flight_mode':None,'armed':False,'gps_satellites':None,'gps_accuracy':None}
+ async def get_telemetry(self): return {'source':'mavlink','timestamp':None,'latitude':None,'longitude':None,'altitude':None,'ground_speed':None,'air_speed':None,'heading':None,'battery':{'percentage':None,'voltage':None,'current':None},'flight_mode':None,'armed':False,'gps_satellites':None,'gps_accuracy':None,'roll':None,'pitch':None,'yaw':None}
  async def command(self,name,payload=None): raise HTTPException(501,'Physical commands disabled: adapter and company safety validation required')
  async def upload_mission(self,items): raise HTTPException(501,'Physical mission upload disabled until adapter validation')
  async def download_mission(self): raise HTTPException(501,'Physical mission download disabled until adapter validation')

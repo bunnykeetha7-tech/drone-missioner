@@ -83,7 +83,7 @@
       drone = L.marker(point, { icon: droneIcon(telemetry.heading) }).addTo(map).bindPopup(dronePopup(telemetry));
       map.setView(point, 15);
     } else { drone.setLatLng(point); drone.setIcon(droneIcon(telemetry.heading)); drone.setPopupContent(dronePopup(telemetry)); }
-    if (options.centerOnDrone) map.setView(point, Math.max(map.getZoom(),15));
+    if (options.centerOnDrone) { map.setView(point, Math.max(map.getZoom(),15)); console.info('[Map] Imported drone position updated', { latitude: point[0], longitude: point[1], heading: telemetry.heading }); }
     const pathPoints=Array.isArray(track)?track.filter(p=>Array.isArray(p)&&p.length>=2&&p.every(Number.isFinite)):[];
     const uniquePoints=new Set(pathPoints.map(p=>`${p[0].toFixed(7)},${p[1].toFixed(7)}`));
     path?.setLatLngs(uniquePoints.size>=2?pathPoints:[]);

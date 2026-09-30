@@ -1,12 +1,30 @@
 import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+class TelemetryBroadcaster:
+    """Fan out state changes to the existing telemetry WebSocket clients."""
+    def __init__(self):
+        self.clients = set()
+
+    async def broadcast(self, message):
+        stale = []
+        for client in tuple(self.clients):
+            try:
+                await client.send_json(message)
+            except Exception:
+                stale.append(client)
+        for client in stale:
+            self.clients.discard(client)
+
+telemetry_broadcaster = TelemetryBroadcaster()
+
 def build_websocket_router(source_getter, simulator, load_config):
     router = APIRouter()
 
     @router.websocket('/ws/telemetry')
     async def telemetry_stream(ws: WebSocket):
         await ws.accept()
+        telemetry_broadcaster.clients.add(ws)
         try:
             while True:
                 src = source_getter()
@@ -16,5 +34,7 @@ def build_websocket_router(source_getter, simulator, load_config):
                 await asyncio.sleep(interval)
         except WebSocketDisconnect:
             return
+        finally:
+            telemetry_broadcaster.clients.discard(ws)
 
     return router

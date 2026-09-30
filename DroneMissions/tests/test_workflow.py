@@ -1,5 +1,5 @@
 import json, sys, tempfile, time, unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -123,6 +123,20 @@ class Workflow(unittest.TestCase):
   t=r.json()['telemetry']; self.assertEqual(t['source'],'simulation'); self.assertEqual(t['altitude'],120.5); self.assertEqual(t['ground_speed'],8.4); self.assertEqual(t['battery'],{'percentage':82.0,'voltage':15.9,'current':4.2}); self.assertEqual(t['flight_mode'],'LOITER'); self.assertTrue(t['armed']); self.assertEqual((t['latitude'],t['longitude']),(13.0827,80.2707)); self.assertEqual(t['gps_satellites'],14); self.assertEqual(t['gps_accuracy'],2.5)
   self.assertIsNone(backend.simulator.flight); self.assertEqual(backend.simulator.index,0)
   self.assertEqual(self.client.get('/api/drone/telemetry',headers=self.h).json()['latitude'],13.0827)
+ def test_requested_sample_and_nested_gps_import(self):
+  sample={'source':'simulation','timestamp':None,'latitude':16.5427,'longitude':79.5890,'altitude':20.0,'ground_speed':5.0,'heading':90.0,'battery':{'percentage':85,'voltage':15.8,'current':3.2},'flight_mode':'LOITER','armed':True,'gps_satellites':12,'gps_accuracy':5.0}
+  r=self.client.post('/api/telemetry/import',headers=self.h,json=sample); self.assertEqual(r.status_code,200,r.text)
+  t=self.client.get('/api/drone/telemetry',headers=self.h).json()
+  self.assertEqual((t['latitude'],t['longitude'],t['altitude'],t['ground_speed'],t['heading']),(16.5427,79.5890,20.0,5.0,90.0))
+  self.assertEqual(t['battery'],{'percentage':85.0,'voltage':15.8,'current':3.2}); self.assertEqual(t['flight_mode'],'LOITER'); self.assertTrue(t['armed']); self.assertEqual(t['gps_satellites'],12)
+  self.client.post('/api/telemetry/reset',headers=self.h)
+  nested={'source':'simulation','gps':{'latitude':16.5427,'longitude':79.5890,'satellites':12,'accuracy':5.0},'altitude':20,'ground_speed':5}
+  r=self.client.post('/api/telemetry/import',headers=self.h,json=nested); self.assertEqual(r.status_code,200,r.text)
+  t=r.json()['telemetry']; self.assertEqual((t['latitude'],t['longitude'],t['gps_satellites'],t['gps_accuracy']),(16.5427,79.5890,12,5.0))
+ def test_import_requires_a_usable_gps_fix(self):
+  d={'source':'simulation','altitude':20,'ground_speed':5}
+  r=self.client.post('/api/telemetry/import',headers=self.h,json=d)
+  self.assertEqual(r.status_code,400); self.assertEqual(r.json()['detail'],'Invalid telemetry data: latitude/longitude are required.')
  def test_invalid_battery_and_gps_rejected(self):
   d=self.demo(); d['battery']['percentage']=101; r=self.client.post('/api/telemetry/import',headers=self.h,json=d); self.assertEqual(r.status_code,400); self.assertIn('Battery percentage',r.json()['detail'])
   d=self.demo(); d['latitude']=91; r=self.client.post('/api/telemetry/import',headers=self.h,json=d); self.assertEqual(r.status_code,400); self.assertIn('GPS',r.json()['detail'])
@@ -138,6 +152,13 @@ class Workflow(unittest.TestCase):
   self.client.post('/api/telemetry/import',headers=self.h,json=self.demo())
   with self.client.websocket_connect('/ws/telemetry') as ws:
    d=ws.receive_json(); self.assertEqual(d['telemetry']['altitude'],120.5); self.assertEqual(d['telemetry']['battery']['percentage'],82); self.assertEqual(d['telemetry']['latitude'],13.0827)
+ def test_import_pushes_state_to_existing_websocket_broadcaster(self):
+  sample=self.demo()
+  with patch('backend.api.telemetry.telemetry_broadcaster.broadcast',new_callable=AsyncMock) as broadcast:
+   r=self.client.post('/api/telemetry/import',headers=self.h,json=sample)
+   self.assertEqual(r.status_code,200,r.text); broadcast.assert_awaited_once()
+   packet=broadcast.await_args.args[0]
+   self.assertEqual(packet['telemetry']['latitude'],sample['latitude']); self.assertEqual(packet['telemetry']['heading'],sample['heading']); self.assertEqual(packet['track'],[[sample['latitude'],sample['longitude']]])
  def test_mission_simulation_still_completes_and_logs(self):
   before=len(self.client.get('/api/flights',headers=self.h).json())
   self.client.post('/api/drone/connect',headers=self.h)
