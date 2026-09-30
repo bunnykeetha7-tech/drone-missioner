@@ -80,20 +80,38 @@ class PhoneTelemetry(DroneInterface):
   allowed={'latitude','longitude','ground_speed','heading','roll','pitch','yaw','altitude','battery','voltage','current','gps_satellites'}; self.data={k:v for k,v in data.items() if k in allowed}; self.data.update({'air_speed':self.data.get('ground_speed',0),'armed':False,'flight_mode':'PHONE TELEMETRY'})
 
 class MAVLinkDrone(DroneInterface):
- async def connect(self): raise HTTPException(501,'Real drone connection is not configured.')
- async def disconnect(self): return {'connected':False}
- async def get_status(self): return {'connected':False,'state':'DISCONNECTED','mode':'REAL DRONE','source':'real_drone','connection_type':'OTHER','connection_state':'DISCONNECTED','connection_method':'NOT CONFIGURED','link_status':'OFFLINE','link_quality':'OFFLINE','link_quality_percent':None,'telemetry_status':'NOT RECEIVING','heartbeat':'--','heartbeat_at':None,'heartbeat_source':None,'protocol':'NOT CONFIGURED','simulated':False,'adapter_ready':False,'message':'REAL DRONE · NOT CONFIGURED. Confirm company hardware details and validate an adapter before connecting.'}
+ def __init__(self): self.connection_config=None; self.validated_adapter=None
+ async def connect(self,config=None):
+  config=config or {}; transport=str(config.get('transport','')).lower().strip(); endpoint=str(config.get('endpoint','')).strip()
+  if not transport and not endpoint: raise HTTPException(501,'REAL DRONE · NOT CONFIGURED. Select USB/Serial or Wi-Fi and enter its explicit endpoint; a validated protocol adapter is still required.')
+  if transport not in ('serial','udp','tcp'): raise HTTPException(400,'Choose USB/Serial, Wi-Fi UDP, or Wi-Fi TCP.')
+  if not endpoint: raise HTTPException(400,'Enter the explicit connection endpoint.')
+  if transport in ('udp','tcp'):
+   from urllib.parse import urlsplit
+   try: parsed=urlsplit(endpoint); port=parsed.port
+   except ValueError: raise HTTPException(400,f'Enter a valid {transport.upper()} endpoint such as {transport}://host:port.')
+   if parsed.scheme.lower()!=transport or not parsed.hostname or port is None or not 1<=port<=65535: raise HTTPException(400,f'Enter a {transport.upper()} endpoint such as {transport}://host:port.')
+  self.connection_config={'transport':transport,'endpoint':endpoint}
+  if self.validated_adapter is None: raise HTTPException(501,'REAL DRONE · ADAPTER UNAVAILABLE. Connection details were recorded for this session, but no connection was attempted. Confirm the company protocol and implement/test its adapter before enabling physical control.')
+  raise HTTPException(501,'The configured real-drone adapter has not implemented a verified connection.')
+ async def disconnect(self): return await self.get_status()
+ async def get_status(self):
+  config=self.connection_config; method=(f"{config['transport'].upper()} · {config['endpoint']} · NOT CONFIGURED" if config else 'NOT CONFIGURED')
+  return {'connected':False,'state':'DISCONNECTED','mode':'REAL DRONE','source':'real_drone','connection_type':config['transport'].upper() if config else 'OTHER','connection_state':'DISCONNECTED','connection_method':method,'link_status':'OFFLINE','link_quality':'OFFLINE','link_quality_percent':None,'telemetry_status':'NOT RECEIVING','heartbeat':'--','heartbeat_at':None,'heartbeat_source':None,'protocol':'NOT CONFIGURED','simulated':False,'adapter_ready':False,'physical_control_enabled':False,'message':'REAL DRONE · ADAPTER UNAVAILABLE. Physical controls remain OFF until a protocol adapter is implemented, tested, and validated.'}
  async def get_telemetry(self): return {'source':'mavlink','timestamp':None,'latitude':None,'longitude':None,'altitude':None,'ground_speed':None,'vertical_speed':None,'air_speed':None,'heading':None,'battery':{'percentage':None,'voltage':None,'current':None},'flight_mode':None,'armed':False,'gps_satellites':None,'gps_accuracy':None,'roll':None,'pitch':None,'yaw':None}
- async def command(self,name,payload=None): raise HTTPException(501,'Physical commands disabled: adapter and company safety validation required')
+ async def command(self,name,payload=None):
+  if name=='connect': return await self.connect(payload)
+  if name=='disconnect': return await self.disconnect()
+  raise HTTPException(501,'Physical commands disabled: adapter and company safety validation required')
  async def upload_mission(self,items): raise HTTPException(501,'Physical mission upload disabled until adapter validation')
  async def download_mission(self): raise HTTPException(501,'Physical mission download disabled until adapter validation')
  async def get_parameters(self): raise HTTPException(501,'Physical parameters unavailable until adapter validation')
  async def set_parameter(self,name,value): raise HTTPException(501,'Physical parameter writes disabled until adapter validation')
 
-init_db(); simulator=SimulationDrone(loadj,savej,db); phone=PhoneTelemetry(); gimbal=GimbalSimulator(loadj); app=FastAPI(title='Drone Missions | Ground Control Station',version='1.0.0'); app.add_middleware(CORSMiddleware,allow_origins=['*'],allow_methods=['*'],allow_headers=['*'])
+init_db(); simulator=SimulationDrone(loadj,savej,db); phone=PhoneTelemetry(); mavlink=MAVLinkDrone(); gimbal=GimbalSimulator(loadj); app=FastAPI(title='Drone Missions | Ground Control Station',version='1.0.0'); app.add_middleware(CORSMiddleware,allow_origins=['*'],allow_methods=['*'],allow_headers=['*'])
 def source():
  mode=os.getenv('DATA_SOURCE',loadj('drone.json').get('mode','SIMULATION')).lower()
- return {'simulation':simulator,'mavlink':MAVLinkDrone()}.get(mode,simulator)
+ return {'simulation':simulator,'mavlink':mavlink}.get(mode,simulator)
 class Login(BaseModel): username:str; password:str
 class Register(BaseModel): username:str; password:str; full_name:str|None=None; email:str|None=None
 class MissionIn(BaseModel): name:str='New Mission'; items:list[dict[str,Any]]=[]
@@ -133,10 +151,9 @@ async def create_drone(body:dict,user=__import__('fastapi').Depends(authdep)):
 @app.get('/api/drone/status')
 async def status(user=__import__('fastapi').Depends(authdep)): return await source().get_status()
 @app.post('/api/drone/auto-connect')
-async def auto_connect(user=__import__('fastapi').Depends(authdep)):
- # Simulation is the only implemented and verified auto-connect candidate today.
- # The real-drone placeholder is deliberately skipped until its adapter is validated.
- os.environ['DATA_SOURCE']='simulation'
+async def auto_connect(body:dict|None=None,user=__import__('fastapi').Depends(authdep)):
+ if source() is not simulator:
+  return await mavlink.connect(body)
  await simulator.connect()
  telemetry=await simulator.get_telemetry()
  state=await simulator.get_status()

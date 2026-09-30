@@ -23,7 +23,7 @@ The Settings page keeps Real Drone unavailable until the company aircraft protoc
 
 The frontend uses the same telemetry/WebSocket interfaces regardless of adapter. `DATA_SOURCE=simulation` is the default; `DATA_SOURCE=mavlink` selects the disabled adapter. Settings can switch between Simulation and Real Drone. The older phone sensor code is isolated and is not a drone data source or an option in the GCS.
 
-The dashboard **Auto Connect** calls `POST /api/drone/auto-connect`, selects the currently available Simulation adapter, connects it, and verifies a telemetry response before displaying CONNECTED. Link quality and heartbeat are explicitly marked simulated. No validated physical adapter is configured in this project, so Auto Connect does not probe or command hardware. Manual Connect in Real Drone mode reports the adapter as unavailable rather than simulating a physical connection.
+The dashboard **Auto Connect** and **Manual Connect** operate on the currently selected source. Simulation Auto Connect verifies a simulator telemetry sample and simulated heartbeat. In Real Drone mode, choose USB/Serial, Wi-Fi UDP, or Wi-Fi TCP and enter the company-provided endpoint; the backend validates the endpoint format but deliberately does not open a device or socket because this project has no company protocol adapter. Both Real Drone connection buttons return an explicit adapter-unavailable response, preserve Real Drone mode, and leave physical controls OFF. This is not a successful physical connection. After the company protocol is identified, implement and validate its adapter against `DroneInterface`; the frontend can continue using the common telemetry/status API.
 
 Connection telemetry health is based on backend telemetry reception, not the Connect button. A working simulator reports `RECEIVING`, `Heartbeat: OK`, `Link: GOOD`, and `Protocol: SIMULATION`; these values describe the simulator only. A missed telemetry stream reports `STALE`. Disconnect preserves simulator telemetry, missions, parameters, and browser Current Location. Auto Connect never arms or starts a flight action.
 
@@ -104,3 +104,4 @@ FastAPI explorer: `/docs`. Protected routes use `Authorization: Bearer <access_t
 ## Tests and limitations
 
 Run `python -m unittest discover -s tests` and `python -m compileall backend`. Browser map tiles need internet. A physical drone and browser geolocation hardware were not available for hardware/browser-permission testing. The demo JWT secret is not suitable for public deployment; set a strong `JWT_SECRET` and secure the service before any non-demo use.
+

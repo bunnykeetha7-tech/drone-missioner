@@ -10,7 +10,7 @@ class Workflow(unittest.TestCase):
  @classmethod
  def setUpClass(cls): cls.client=TestClient(backend.app)
  def setUp(self):
-  backend.os.environ['DATA_SOURCE']='simulation'; backend.simulator.connected=False; backend.simulator.reset()
+  backend.os.environ['DATA_SOURCE']='simulation'; backend.mavlink.connection_config=None; backend.simulator.connected=False; backend.simulator.reset()
   r=self.client.post('/api/auth/login',json={'username':'admin','password':'admin123'}); self.assertEqual(r.status_code,200); self.h={'Authorization':'Bearer '+r.json()['access_token']}
  def demo(self): return json.loads((ROOT/'config'/'demo_telemetry.json').read_text(encoding='utf-8'))
  def test_map_elevation_lookup_returns_coordinate_and_terrain(self):
@@ -193,6 +193,34 @@ class Workflow(unittest.TestCase):
  def test_real_adapter_remains_fail_closed(self):
   r=self.client.post('/api/config/source',headers=self.h,json={'mode':'mavlink'}); self.assertFalse(r.json()['adapter_ready']); self.assertEqual(self.client.post('/api/drone/connect',headers=self.h).status_code,501); self.assertEqual(self.client.post('/api/telemetry/import',headers=self.h,json=self.demo()).status_code,409)
   t=self.client.get('/api/drone/telemetry',headers=self.h).json(); self.assertEqual(t['source'],'mavlink'); self.assertIsNone(t['latitude']); self.assertIsNone(t['battery']['percentage'])
+ def test_real_transport_choices_never_claim_unimplemented_connection(self):
+  selected=self.client.post('/api/config/source',headers=self.h,json={'mode':'mavlink'}); self.assertEqual(selected.status_code,200)
+  for body in ({'transport':'serial','endpoint':'COM3'},{'transport':'udp','endpoint':'udp://192.168.1.50:14550'},{'transport':'tcp','endpoint':'tcp://192.168.1.50:5760'}):
+   response=self.client.post('/api/drone/connect',headers=self.h,json=body)
+   self.assertEqual(response.status_code,501,response.text)
+   self.assertIn('ADAPTER UNAVAILABLE',response.json()['detail'])
+   status=self.client.get('/api/drone/status',headers=self.h).json()
+   self.assertFalse(status['connected']); self.assertFalse(status['adapter_ready']); self.assertFalse(status['physical_control_enabled']); self.assertEqual(status['connection_state'],'DISCONNECTED')
+   self.assertIn(body['endpoint'],status['connection_method'])
+ def test_auto_connect_preserves_selected_real_drone_mode(self):
+  self.client.post('/api/config/source',headers=self.h,json={'mode':'mavlink'})
+  response=self.client.post('/api/drone/auto-connect',headers=self.h,json={'transport':'udp','endpoint':'udp://127.0.0.1:14550'})
+  self.assertEqual(response.status_code,501,response.text)
+  self.assertEqual(self.client.get('/api/drone/telemetry',headers=self.h).json()['source'],'mavlink')
+  status=self.client.get('/api/drone/status',headers=self.h).json()
+  self.assertFalse(status['physical_control_enabled']); self.assertFalse(status['connected'])
+ def test_real_transport_endpoint_validation(self):
+  self.client.post('/api/config/source',headers=self.h,json={'mode':'mavlink'})
+  for body in ({'transport':'serial','endpoint':''},{'transport':'udp','endpoint':'udp://host:notaport'},{'transport':'udp','endpoint':'tcp://host:14550'},{'transport':'unknown','endpoint':'x'}):
+   self.assertEqual(self.client.post('/api/drone/connect',headers=self.h,json=body).status_code,400)
+ def test_connection_panel_exposes_transport_and_physical_control_lock(self):
+  for path in ('/','/dashboard.html'):
+   page=self.client.get(path).text
+   for item in ('id="autoConnectBtn"','id="connectionConnectBtn"','id="realConnectionConfig"','id="realTransport"','value="serial"','value="udp"','value="tcp"','id="realEndpoint"','id="physicalControlStatus"','OFF · ADAPTER NOT VALIDATED'):
+    self.assertIn(item,page)
+  app_js=(ROOT/'frontend'/'js'/'app.js').read_text(encoding='utf-8')
+  self.assertIn("status.connected&&status.adapter_ready&&status.physical_control_enabled",app_js)
+  self.assertIn("'OFF · ADAPTER NOT VALIDATED'",app_js)
  def test_source_and_limits(self):
   self.assertEqual(self.client.get('/api/config',headers=self.h).status_code,200); self.assertEqual(self.client.post('/api/config/source',headers=self.h,json={'mode':'simulation'}).status_code,200)
   m=self.client.post('/api/missions',headers=self.h,json={'name':'limit','items':[{'latitude':13.083,'longitude':80.2707,'altitude':999,'speed':2,'command':'WAYPOINT'}]}).json(); v=self.client.post(f"/api/missions/{m['id']}/validate",headers=self.h).json(); self.assertFalse(v['valid']); self.assertTrue(any('50 m' in e for e in v['errors']))
