@@ -30,7 +30,7 @@ Connection telemetry health is based on backend telemetry reception, not the Con
 ## Windows quick start
 
 1. Install Python 3.10 or newer and enable **Add Python to PATH**.
-2. Double-click `start.bat` from the extracted project folder. It creates `.venv`, installs requirements, and runs Uvicorn on `0.0.0.0:8000`.
+2. Double-click `start.bat` from the extracted project folder. It creates `.venv`, installs requirements, and runs Uvicorn on `0.0.0.0:8000`. If Drone Missions is already running, the launcher opens that instance instead of starting a duplicate. If a different application owns port 8000, close it before starting Drone Missions.
 3. Open `http://127.0.0.1:8000`; Swagger is at `http://127.0.0.1:8000/docs`. Other devices on the LAN can use the host PC's LAN address on port 8000. Only use trusted networks.
 4. Demo login: **admin / admin123**.
 
