@@ -1,0 +1,8 @@
+{
+  "mode": "SIMULATION",
+  "pitch_min_degrees": -45,
+  "pitch_max_degrees": 45,
+  "default_normalized_pitch": 0,
+  "default_shake_enabled": true,
+  "default_shake_intensity": 0.35
+}

@@ -13,6 +13,7 @@ from backend.api.telemetry import build_telemetry_router
 from backend.api.websocket import build_websocket_router
 from backend.api.map import build_map_router
 from backend.api.parameters import build_parameters_router
+from backend.api.gimbal import build_gimbal_router
 
 ROOT=Path(__file__).resolve().parent.parent
 CFG=ROOT/'config'; DB=ROOT/'backend'/'database'/'drone_missions.db'
@@ -56,6 +57,7 @@ def current_user(auth):
  except Exception: raise HTTPException(401,'Invalid or expired token')
 
 from backend.drone.simulator import SimulationDrone
+from backend.drone.gimbal_simulator import GimbalSimulator
 
 class PhoneTelemetry(DroneInterface):
  def __init__(self): self.connected=False; self.data={}; self.items=[]
@@ -82,7 +84,7 @@ class MAVLinkDrone(DroneInterface):
  async def get_parameters(self): raise HTTPException(501,'Physical parameters unavailable until adapter validation')
  async def set_parameter(self,name,value): raise HTTPException(501,'Physical parameter writes disabled until adapter validation')
 
-init_db(); simulator=SimulationDrone(loadj,savej,db); phone=PhoneTelemetry(); app=FastAPI(title='Drone Missions | Ground Control Station',version='1.0.0'); app.add_middleware(CORSMiddleware,allow_origins=['*'],allow_methods=['*'],allow_headers=['*'])
+init_db(); simulator=SimulationDrone(loadj,savej,db); phone=PhoneTelemetry(); gimbal=GimbalSimulator(loadj); app=FastAPI(title='Drone Missions | Ground Control Station',version='1.0.0'); app.add_middleware(CORSMiddleware,allow_origins=['*'],allow_methods=['*'],allow_headers=['*'])
 def source():
  mode=os.getenv('DATA_SOURCE',loadj('drone.json').get('mode','SIMULATION')).lower()
  return {'simulation':simulator,'mavlink':MAVLinkDrone()}.get(mode,simulator)
@@ -91,7 +93,8 @@ class Register(BaseModel): username:str; password:str
 class MissionIn(BaseModel): name:str='New Mission'; items:list[dict[str,Any]]=[]
 class PhoneIn(BaseModel): data:dict[str,Any]
 def authdep(authorization:str|None=Header(default=None)): return current_user(authorization)
-app.include_router(build_telemetry_router(simulator,source,authdep))
+app.include_router(build_telemetry_router(simulator,source,authdep,gimbal))
+app.include_router(build_gimbal_router(gimbal,authdep))
 app.include_router(build_websocket_router(source,simulator,loadj))
 app.include_router(build_map_router(authdep))
 app.include_router(build_parameters_router(ROOT,loadj,savej,source,simulator,authdep))

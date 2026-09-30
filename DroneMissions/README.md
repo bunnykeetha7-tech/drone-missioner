@@ -7,6 +7,7 @@ A local-first GCS with an explicit JSON-powered simulation mode. Dashboard telem
 - FastAPI backend, responsive dashboard, JWT authentication and SQLite persistence
 - Simulation mission editor, validation, upload, controls, live WebSocket telemetry, maps, charts and generated flight logs
 - Dashboard Drone Connection panel with Auto Connect, explicit connection states, link/telemetry health, heartbeat, protocol and connection method
+- Dashboard simulated gimbal/camera preview with configurable normalized pitch mapping and adjustable preview shake; it is not a live video feed
 - Safe initial telemetry with unavailable GPS; import and reset simulation telemetry through dedicated backend routes
 - Independent map-click terrain elevation lookup and browser Current Location; map coordinates, device GPS, and drone telemetry use separate markers and state
 - Simulation parameter management in `config/parameters.json`
@@ -75,6 +76,10 @@ Before implementing an adapter, obtain the manufacturer's identity and model, fl
 
 Implement and test the appropriate adapter against the common interface using the company simulator/SITL. Map only measured device data; leave unavailable fields null and mark source as real. Do not substitute simulator JSON or enable physical commands because a connection succeeded. Verify heartbeat, telemetry, parameter reads, mission download/upload, then commands under company procedure. Use appropriate bench precautions and never rely on this application as the sole flight safety system.
 
+## Simulated camera and gimbal
+
+The dashboard camera panel is an abstract HUD preview labeled **SIMULATED CAMERA · NO LIVE VIDEO SOURCE**. It renders no captured or fabricated live video. Its gimbal state is independent of drone telemetry and flight attitude. The pitch slider maps normalized values from -1 (down) through 0 (center) to +1 (up), using the limits in `config/gimbal.json`. Preview-only shake can be disabled or adjusted from the panel. **Reset Simulation** restores both aircraft and gimbal simulation defaults. REST endpoints are `GET /api/gimbal/status`, `POST /api/gimbal/pitch`, `POST /api/gimbal/settings`, and `POST /api/gimbal/reset`.
+
 ## API
 
 FastAPI explorer: `/docs`. Protected routes use `Authorization: Bearer <access_token>`.
@@ -84,6 +89,7 @@ FastAPI explorer: `/docs`. Protected routes use `Authorization: Bearer <access_t
 - Connection: `POST /api/drone/auto-connect` (currently selects and verifies the JSON simulator)
 - Parameters: `GET /api/parameters`, `PUT /api/parameters/{dotted.name}`, `POST /api/parameters/import`, `POST /api/parameters/reset`
 - Telemetry: `POST /api/telemetry/import`, `/api/telemetry/reset`; WebSocket `/ws/telemetry`
+- Simulated gimbal: `GET /api/gimbal/status`, `POST /api/gimbal/pitch`, `/api/gimbal/settings`, `/api/gimbal/reset`
 - Map: `GET /api/map/elevation?latitude=...&longitude=...` (terrain elevation lookup)
 - Missions: `GET/POST /api/missions`, `GET/PUT/DELETE /api/missions/{id}`, `POST /api/missions/{id}/validate|upload`
 - Parameters: `GET /api/parameters`, `PUT /api/parameters/{dotted.name}`

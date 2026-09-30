@@ -3,7 +3,7 @@ import math
 from pydantic import ValidationError
 from backend.schemas.telemetry import TelemetryState
 
-def build_telemetry_router(simulator, source_getter, auth_dependency):
+def build_telemetry_router(simulator, source_getter, auth_dependency, gimbal=None):
     router = APIRouter()
 
     @router.post('/api/telemetry/import')
@@ -62,6 +62,8 @@ def build_telemetry_router(simulator, source_getter, auth_dependency):
     async def reset_telemetry(user=Depends(auth_dependency)):
         if source_getter() is not simulator:
             raise HTTPException(409, 'Reset is available only in Simulation mode.')
-        return {'ok': True, 'telemetry': simulator.reset_simulation(), 'status': await simulator.get_status()}
+        if gimbal is not None:
+            gimbal.reset()
+        return {'ok': True, 'telemetry': simulator.reset_simulation(), 'status': await simulator.get_status(), 'gimbal': gimbal.status() if gimbal is not None else None}
 
     return router
