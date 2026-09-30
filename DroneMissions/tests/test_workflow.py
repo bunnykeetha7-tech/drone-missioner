@@ -117,17 +117,17 @@ class Workflow(unittest.TestCase):
   self.assertIn('MAX ALTITUDE EXCEEDED',app_js); self.assertIn('ALTITUDE APPROACHING LIMIT',app_js); self.assertIn("telemetry_status:lastConnectionStatus.connected?'STALE'",app_js)
  def test_clean_start_safe_telemetry(self):
   t=self.client.get('/api/drone/telemetry',headers=self.h).json()
-  self.assertEqual((t['latitude'],t['longitude']),(None,None)); self.assertEqual(t['altitude'],0.0); self.assertEqual(t['ground_speed'],0.0); self.assertEqual(t['battery'],{'percentage':100.0,'voltage':16.8,'current':0.0}); self.assertEqual(t['flight_mode'],'STABILIZE'); self.assertFalse(t['armed']); self.assertEqual(t['gps_satellites'],0); self.assertIsNone(t['gps_accuracy']); self.client.post('/api/drone/connect',headers=self.h); connected=self.client.get('/api/drone/telemetry',headers=self.h).json(); self.assertIsNone(connected['latitude']); self.assertEqual(connected['gps_satellites'],0)
+  self.assertEqual((t['latitude'],t['longitude']),(None,None)); self.assertEqual(t['altitude'],0.0); self.assertEqual(t['ground_speed'],0.0); self.assertEqual(t['vertical_speed'],0.0); self.assertEqual(t['heading'],0.0); self.assertEqual(t['battery'],{'percentage':0.0,'voltage':0.0,'current':0.0}); self.assertEqual(t['flight_mode'],'STABILIZE'); self.assertFalse(t['armed']); self.assertEqual(t['gps_satellites'],0); self.assertIsNone(t['gps_accuracy']); self.client.post('/api/drone/connect',headers=self.h); connected=self.client.get('/api/drone/telemetry',headers=self.h).json(); self.assertIsNone(connected['latitude']); self.assertEqual(connected['gps_satellites'],0)
  def test_import_json_updates_backend_and_does_not_execute_controls(self):
   r=self.client.post('/api/telemetry/import',headers=self.h,json=self.demo()); self.assertEqual(r.status_code,200,r.text)
   t=r.json()['telemetry']; self.assertEqual(t['source'],'simulation'); self.assertEqual(t['altitude'],120.5); self.assertEqual(t['ground_speed'],8.4); self.assertEqual(t['battery'],{'percentage':82.0,'voltage':15.9,'current':4.2}); self.assertEqual(t['flight_mode'],'LOITER'); self.assertTrue(t['armed']); self.assertEqual((t['latitude'],t['longitude']),(13.0827,80.2707)); self.assertEqual(t['gps_satellites'],14); self.assertEqual(t['gps_accuracy'],2.5)
   self.assertIsNone(backend.simulator.flight); self.assertEqual(backend.simulator.index,0)
   self.assertEqual(self.client.get('/api/drone/telemetry',headers=self.h).json()['latitude'],13.0827)
  def test_requested_sample_and_nested_gps_import(self):
-  sample={'source':'simulation','timestamp':None,'latitude':16.5427,'longitude':79.5890,'altitude':20.0,'ground_speed':5.0,'heading':90.0,'battery':{'percentage':85,'voltage':15.8,'current':3.2},'flight_mode':'LOITER','armed':True,'gps_satellites':12,'gps_accuracy':5.0}
+  sample={'source':'simulation','timestamp':None,'latitude':16.5427,'longitude':79.5890,'altitude':20.0,'ground_speed':5.0,'vertical_speed':0.5,'heading':90.0,'roll':2.0,'pitch':3.0,'battery':{'percentage':85,'voltage':15.8,'current':3.2},'flight_mode':'LOITER','armed':True,'gps_satellites':12,'gps_accuracy':5.0}
   r=self.client.post('/api/telemetry/import',headers=self.h,json=sample); self.assertEqual(r.status_code,200,r.text)
   t=self.client.get('/api/drone/telemetry',headers=self.h).json()
-  self.assertEqual((t['latitude'],t['longitude'],t['altitude'],t['ground_speed'],t['heading']),(16.5427,79.5890,20.0,5.0,90.0))
+  self.assertEqual((t['latitude'],t['longitude'],t['altitude'],t['ground_speed'],t['vertical_speed'],t['heading']),(16.5427,79.5890,20.0,5.0,0.5,90.0)); self.assertEqual((t['roll'],t['pitch']),(2.0,3.0))
   self.assertEqual(t['battery'],{'percentage':85.0,'voltage':15.8,'current':3.2}); self.assertEqual(t['flight_mode'],'LOITER'); self.assertTrue(t['armed']); self.assertEqual(t['gps_satellites'],12)
   self.client.post('/api/telemetry/reset',headers=self.h)
   nested={'source':'simulation','gps':{'latitude':16.5427,'longitude':79.5890,'satellites':12,'accuracy':5.0},'altitude':20,'ground_speed':5}
@@ -144,7 +144,7 @@ class Workflow(unittest.TestCase):
   raw='{"source":"simulation","altitude":NaN,"battery":{"percentage":80}}'; r=self.client.post('/api/telemetry/import',headers={**self.h,'Content-Type':'application/json'},content=raw); self.assertEqual(r.status_code,400)
  def test_reset_clears_imported_state_and_track(self):
   self.client.post('/api/telemetry/import',headers=self.h,json=self.demo()); r=self.client.post('/api/telemetry/reset',headers=self.h); self.assertEqual(r.status_code,200)
-  t=self.client.get('/api/drone/telemetry',headers=self.h).json(); self.assertEqual((t['latitude'],t['longitude']),(None,None)); self.assertEqual(t['altitude'],0.0); self.assertEqual(t['ground_speed'],0.0); self.assertEqual(t['battery']['percentage'],100.0); self.assertEqual(t['battery']['voltage'],16.8); self.assertEqual(t['battery']['current'],0.0); self.assertEqual(t['flight_mode'],'STABILIZE'); self.assertFalse(t['armed']); self.assertEqual(t['gps_satellites'],0); self.assertEqual(t['track'],[])
+  t=self.client.get('/api/drone/telemetry',headers=self.h).json(); self.assertEqual((t['latitude'],t['longitude']),(None,None)); self.assertEqual(t['altitude'],0.0); self.assertEqual(t['ground_speed'],0.0); self.assertEqual(t['vertical_speed'],0.0); self.assertEqual(t['battery']['percentage'],0.0); self.assertEqual(t['battery']['voltage'],0.0); self.assertEqual(t['battery']['current'],0.0); self.assertEqual(t['flight_mode'],'STABILIZE'); self.assertFalse(t['armed']); self.assertEqual(t['gps_satellites'],0); self.assertEqual(t['track'],[])
  def test_phone_is_not_a_drone_source(self):
   r=self.client.post('/api/config/source',headers=self.h,json={'mode':'phone'}); self.assertEqual(r.status_code,400)
   self.assertEqual(self.client.get('/api/drone/telemetry',headers=self.h).json()['source'],'simulation')
@@ -177,6 +177,19 @@ class Workflow(unittest.TestCase):
   finally: backend.DB=old
  def test_dashboard_wires_import_reset_and_separate_location(self):
   page=self.client.get('/').text; self.assertIn('id="importTelemetryBtn"',page); self.assertIn('id="resetSimulationBtn"',page); self.assertIn('id="currentLocationBtn"',page); self.assertNotIn('data-mode="phone"',page); self.assertIn('/static/js/map.js',page); self.assertIn('/static/js/telemetry-import.js',page)
+ def test_dashboard_script_tag_is_well_formed_and_controls_are_wired(self):
+  page=self.client.get('/').text; dashboard=self.client.get('/dashboard.html').text
+  for html in (page,dashboard):
+   self.assertIn('<link rel="stylesheet" href="/static/css/app.css?v=gcs-operator-layout-20260930">',html)
+   self.assertIn('<script src="/static/js/map.js?v=gcs-operator-layout-20260930"></script>',html)
+   for script in ('telemetry-import.js','dashboard.js','artificial-horizon.js','app.js','gimbal.js'):
+    self.assertIn(f'<script src="/static/js/{script}',html)
+   self.assertEqual(html.count('id="importTelemetryBtn"'),1); self.assertEqual(html.count('id="telemetryJsonFile"'),1)
+   self.assertIn('id="battery">0 <small>%',html); self.assertIn('id="batteryNote">0.0 V · 0.0 A',html)
+  app=(ROOT/'frontend'/'js'/'app.js').read_text(encoding='utf-8'); importer=(ROOT/'frontend'/'js'/'telemetry-import.js').read_text(encoding='utf-8')
+  self.assertIn("$('#connectionConnectBtn').onclick=()=>connectDrone(false)",app)
+  self.assertIn("trigger.addEventListener('click', () => picker.click())",importer)
+  self.assertIn('window.DroneGimbal?.init()',app)
  def test_real_adapter_remains_fail_closed(self):
   r=self.client.post('/api/config/source',headers=self.h,json={'mode':'mavlink'}); self.assertFalse(r.json()['adapter_ready']); self.assertEqual(self.client.post('/api/drone/connect',headers=self.h).status_code,501); self.assertEqual(self.client.post('/api/telemetry/import',headers=self.h,json=self.demo()).status_code,409)
   t=self.client.get('/api/drone/telemetry',headers=self.h).json(); self.assertEqual(t['source'],'mavlink'); self.assertIsNone(t['latitude']); self.assertIsNone(t['battery']['percentage'])

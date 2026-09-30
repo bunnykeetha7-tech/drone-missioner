@@ -21,6 +21,7 @@ class TelemetryState(BaseModel):
     longitude: float | None = Field(default=None, ge=-180, le=180)
     altitude: float | None = Field(default=None, ge=0)
     ground_speed: float | None = Field(default=None, ge=0)
+    vertical_speed: float | None = None
     heading: float | None = Field(default=None, ge=0, lt=360)
     battery: BatteryTelemetry = Field(default_factory=BatteryTelemetry)
     gps: GPSTelemetry | None = None

@@ -11,6 +11,7 @@
     html('battery', `${fmt(battery.percentage,0)} <small>%</small>`);
     put('batteryNote', `${fmt(battery.voltage)} V · ${fmt(battery.current)} A`);
     put('flightMode', t.flight_mode || '—'); put('armState', t.armed ? 'ARMED' : 'DISARMED');
+    put('gcsVerticalSpeed', `${fmt(t.vertical_speed ?? 0)} m/s`);
     put('lat', hasGPS ? Number(t.latitude).toFixed(6) : 'Unavailable'); put('lon', hasGPS ? Number(t.longitude).toFixed(6) : 'Unavailable');
     put('headingVal', t.heading == null ? 'N/A' : String(Math.round(t.heading)));
     put('voltage', `${fmt(battery.voltage)} V`); put('current', `${fmt(battery.current)} A`);
